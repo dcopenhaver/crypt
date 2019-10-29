@@ -1,14 +1,15 @@
 package main
 
 import (
-	_ "crypto/aes"
-	_ "crypto/cipher"
+	"crypto/aes"
+	"crypto/cipher"
 	"crypto/md5"
-	_ "crypto/rand"
+	"crypto/rand"
 	"crypto/sha1"
 	"crypto/sha256"
 	"crypto/sha512"
 	"encoding/hex"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -127,35 +128,80 @@ func createFileHash(algo string, pathToFile string) string {
 	return hex.EncodeToString(sum_bytes)
 }
 
-//func encrypt(data []byte, passphrase string) []byte {
-//	block, _ := aes.NewCipher([]byte(createMD5Hash(passphrase)))
-//	gcm, _ := cipher.NewGCM(block)
-//	nonce := make([]byte, gcm.NonceSize())
-//	io.ReadFull(rand.Reader, nonce)
-//	ciphertext := gcm.Seal(nonce, nonce, data, nil)
-//	return ciphertext
-//}
-//
-//func decrypt(data []byte, passphrase string) []byte {
-//	key := []byte(createMD5Hash(passphrase))
-//	block, _ := aes.NewCipher(key)
-//	gcm, _ := cipher.NewGCM(block)
-//	nonceSize := gcm.NonceSize()
-//	nonce, ciphertext := data[:nonceSize], data[nonceSize:]
-//	plaintext, _ := gcm.Open(nil, nonce, ciphertext, nil)
-//	return plaintext
-//}
-//
-//func encryptFile(filename string, data []byte, passphrase string) {
-//	f, _ := os.Create(filename)
-//	defer f.Close()
-//	f.Write(encrypt(data, passphrase))
-//}
-//
-//func decryptFile(filename string, passphrase string) []byte {
-//	data, _ := ioutil.ReadFile(filename)
-//	return decrypt(data, passphrase)
-//}
+// AES128/256, GCM
+func encrypt(plaintext_bytes []byte, passphrase string, algo string) ([]byte, error) {
+
+	// AES 128 or 256 determined by key size, 16 bytes for AES128 and 32 bytes for AES256
+	// key derived by hashing passphrase to appropriate length
+
+	key, _ := hex.DecodeString(createHash(passphrase, "sha256"))
+
+	switch algo {
+
+	case "aes128":
+		// grab first 16 bytes for AES128 key
+		key = key[:16]
+
+	case "aes256":
+		// k, all good, key is already 32 bytes
+
+	default:
+		return nil, errors.New("encrypt: Invalid algo")
+	}
+
+	block, err := aes.NewCipher(key)
+	if err != nil {
+		return nil, err
+	}
+
+	gcm, err := cipher.NewGCM(block)
+	if err != nil {
+		return nil, err
+	}
+
+	nonce := make([]byte, gcm.NonceSize())
+
+	_, err = io.ReadFull(rand.Reader, nonce)
+	if err != nil {
+		return nil, err
+	}
+
+	return gcm.Seal(nonce, nonce, plaintext_bytes, nil), nil
+}
+
+func decrypt(ciphertext_bytes []byte, passphrase string, algo string) ([]byte, error) {
+
+	key, _ := hex.DecodeString(createHash(passphrase, "sha256"))
+
+	switch algo {
+
+	case "aes128":
+		// grab first 16 bytes for AES128 key
+		key = key[:16]
+
+	case "aes256":
+		// k, all good, key is already 32 bytes
+
+	default:
+		return nil, errors.New("encrypt: Invalid algo")
+	}
+
+	block, err := aes.NewCipher(key)
+	if err != nil {
+		return nil, err
+	}
+
+	gcm, err := cipher.NewGCM(block)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(ciphertext_bytes) < gcm.NonceSize() {
+		return nil, errors.New("Malformed ciphertext")
+	}
+
+	return gcm.Open(nil, ciphertext_bytes[:gcm.NonceSize()], ciphertext_bytes[gcm.NonceSize():], nil)
+}
 
 func showUsage() {
 	msg := `
@@ -177,15 +223,6 @@ encryption/decryption commands will prompt for key.
 // BEGIN MAIN ---------------------------------
 
 func main() {
-	//	ciphertext := encrypt([]byte("hello world"), password)
-	//	fmt.Println(string(ciphertext))
-	//
-	//	plaintext := decrypt(ciphertext, "password")
-	//	fmt.Println(string(plaintext))
-	//
-	//	encryptFile("example.txt", []byte("hello world"), "password")
-	//	plaintext = decryptFile("example.txt", "password")
-	//	fmt.Println(string(plaintext))
 
 	// input params
 	hashParam := flag.String("h", "", "Specify the hashing algorithm")
@@ -239,7 +276,19 @@ func main() {
 		}
 
 	case "encrypt":
-		//kjkjj
+
+		encrypted_bytes, err := encrypt([]byte("this is a test"), "my crazy passphrase", "aes128")
+		if err != nil {
+			fmt.Println(err)
+		}
+
+		decrypted_bytes, err := decrypt(encrypted_bytes, "my crazy passphrase", "aes128")
+
+		if err != nil {
+			fmt.Println(err)
+		}
+
+		fmt.Println(string(decrypted_bytes))
 	case "decrypt":
 		//kjjkjk
 	}
