@@ -8,6 +8,7 @@ import (
 	"crypto/sha1"
 	"crypto/sha256"
 	"crypto/sha512"
+	"encoding/base64"
 	"encoding/hex"
 	"errors"
 	"flag"
@@ -65,7 +66,7 @@ func createHash(value string, algo string) string {
 		sum_bytes = hasher.Sum(nil)
 
 	default:
-		log.Fatal("Valid algo was not passed in to function: createHash.")
+		log.Fatal("Valid algo was not passed in to function: createHash. ")
 	}
 
 	return hex.EncodeToString(sum_bytes)
@@ -122,7 +123,7 @@ func createFileHash(algo string, pathToFile string) string {
 		sum_bytes = hasher.Sum(nil)
 
 	default:
-		log.Fatal("Valid algo was not passed in to function: createFileHash.")
+		log.Fatal("Valid algo was not passed in to function: createFileHash. ")
 	}
 
 	return hex.EncodeToString(sum_bytes)
@@ -134,7 +135,7 @@ func encrypt(plaintext_bytes []byte, passphrase string, algo string) ([]byte, er
 	// AES 128 or 256 determined by key size, 16 bytes for AES128 and 32 bytes for AES256
 	// key derived by hashing passphrase to appropriate length
 
-	key, _ := hex.DecodeString(createHash(passphrase, "sha256"))
+	key, _ := hex.DecodeString(createHash(passphrase, "sha256")) // returns []byte, error
 
 	switch algo {
 
@@ -171,7 +172,7 @@ func encrypt(plaintext_bytes []byte, passphrase string, algo string) ([]byte, er
 
 func decrypt(ciphertext_bytes []byte, passphrase string, algo string) ([]byte, error) {
 
-	key, _ := hex.DecodeString(createHash(passphrase, "sha256"))
+	key, _ := hex.DecodeString(createHash(passphrase, "sha256")) // returns []byte, error
 
 	switch algo {
 
@@ -181,6 +182,7 @@ func decrypt(ciphertext_bytes []byte, passphrase string, algo string) ([]byte, e
 
 	case "aes256":
 		// k, all good, key is already 32 bytes
+		fmt.Println("HERE")
 
 	default:
 		return nil, errors.New("encrypt: Invalid algo")
@@ -256,6 +258,11 @@ func main() {
 		showUsage()
 	}
 
+	// ensure only ONE command parameter is supplied (either -f or -s, not both (filepath or string))
+	if *filepathParam != "" && *stringParam != "" {
+		showUsage()
+	}
+
 	// below assignment of 'command' will work only because above input validation has already garaunteed only ONE of the 3 options have been supplied
 	if *hashParam != "" {
 		command = "hash"
@@ -277,19 +284,55 @@ func main() {
 
 	case "encrypt":
 
-		encrypted_bytes, err := encrypt([]byte("this is a test"), "my crazy passphrase", "aes128")
-		if err != nil {
-			fmt.Println(err)
+		// get passphrase (used to create key)
+		passphrase := ""
+		fmt.Print("Enter passphrase: ")
+		fmt.Scan(&passphrase)
+
+		fmt.Println(passphrase)
+		fmt.Println(len(passphrase))
+
+		if *stringParam != "" {
+
+			// encrypt and base64 encode the supplied string - send to stdout
+			encrypted_bytes, err := encrypt([]byte(*stringParam), passphrase, strings.ToLower(*encryptParam))
+			if err != nil {
+				log.Fatal("Error occurred during encryption. ", err)
+			}
+
+			fmt.Println(base64.StdEncoding.EncodeToString(encrypted_bytes))
+
+		} else if *filepathParam != "" {
+
+			// encrypt supplied file - create new file named the same as the source file with .crypt appended - leave source file in tact
+
 		}
 
-		decrypted_bytes, err := decrypt(encrypted_bytes, "my crazy passphrase", "aes128")
-
-		if err != nil {
-			fmt.Println(err)
-		}
-
-		fmt.Println(string(decrypted_bytes))
 	case "decrypt":
-		//kjjkjk
+
+		// get passphrase (used to create key)
+		passphrase := ""
+		fmt.Print("Enter passphrase: ")
+		fmt.Scan(&passphrase)
+
+		if *stringParam != "" {
+
+			// base64 decode and decrypt the supplied string - send to stdout
+			encrypted_bytes, err := base64.StdEncoding.DecodeString(*stringParam)
+			if err != nil {
+				log.Fatal("Error base64 decoding encrypted string. ", err)
+			}
+
+			decrypted_bytes, err := decrypt(encrypted_bytes, passphrase, strings.ToLower(*decryptParam))
+			if err != nil {
+				log.Fatal("Error occurred during decryption. ", err)
+			}
+
+			fmt.Println(string(decrypted_bytes))
+
+		} else if *filepathParam != "" {
+
+			// decrypt supplied file, remove .crypt extension, if file with same name already exists (likely), prompt user for overwrite
+		}
 	}
 }
