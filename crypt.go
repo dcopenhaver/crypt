@@ -223,6 +223,7 @@ func fileExists(path string) bool {
 
 func showUsage() {
 	msg := `
+
 crypt -h [md5|sha1|sha256|sha512] -f <path to file>
 crypt -h [md5|sha1|sha256|sha512] -s "string literal"
 crypt -e [aes128|aes256] -f <path to file>
@@ -233,6 +234,7 @@ crypt -d [aes128|aes256] -s "string literal"
 -d: decrypt
 
 encryption/decryption commands will prompt for key.
+
 `
 	fmt.Println(msg)
 	os.Exit(1)
@@ -245,7 +247,7 @@ func main() {
 	// input params
 	hashParam := flag.String("h", "", "Specify the hashing algorithm")
 	encryptParam := flag.String("e", "", "Specify algorithm for encrytion")
-	decryptParam := flag.String("d", "", "Specify algorith for decryption")
+	decryptParam := flag.String("d", "", "Specify algorithm for decryption")
 	filepathParam := flag.String("f", "", "Specify the path to the file to encrypt/decrypt")
 	stringParam := flag.String("s", "", "Specify the literal string to encrypt/decrypt")
 
@@ -360,6 +362,13 @@ func main() {
 		} else if *filepathParam != "" {
 
 			// decrypt supplied file, remove .crypt extension, if file with same name already exists (likely), prompt user for overwrite
+
+			if !strings.HasSuffix(*filepathParam, ".crypt") {
+				log.Fatalf("%s: does not have a '.crypt' suffix - will not attempt decryption.", *filepathParam)
+			}
+
+			decrypted_filepath := strings.TrimSuffix(*filepathParam, ".crypt")
+
 			encrypted_bytes, err := ioutil.ReadFile(*filepathParam)
 			if err != nil {
 				log.Fatalf("Error reading file %s\n%s", *filepathParam, err)
@@ -367,10 +376,25 @@ func main() {
 
 			decrypted_bytes, err := decrypt(encrypted_bytes, passphrase, strings.ToLower(*decryptParam))
 			if err != nil {
-				log.Fatalf("Error decrypting file %s\n%s", *decryptParam, err)
+				log.Fatalf("Error decrypting file %s\n%s", *filepathParam, err)
 			}
 
 			// check if file already exists, prompt for overwrite answer
+			if fileExists(decrypted_filepath) {
+
+				fmt.Printf("%s: already exists and will be overwritten!", decrypted_filepath)
+				fmt.Print("\nOverwrite existing file? [y/n]: ")
+				overwrite := "n"
+				fmt.Scan(&overwrite)
+
+				if strings.ToLower(strings.TrimSpace(overwrite)) == "y" {
+					if ioutil.WriteFile(decrypted_filepath, decrypted_bytes, 0664) != nil {
+						log.Fatalf("Error writting decrypted file: %s\n%s", decrypted_filepath, err)
+					} else {
+						fmt.Printf("File decryption completed. Decrypted file:\n%s\n", decrypted_filepath)
+					}
+				}
+			}
 
 		}
 	}
