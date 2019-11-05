@@ -224,6 +224,13 @@ func fileExists(path string) bool {
 func showUsage() {
 	msg := `
 
+crypt:   A very basic tool for creating hashes and encrypting/decrypting files.
+Author:  David J. Copenhaver
+Version: v0.1
+
+Note: Created only as a place to work out and store functionality I needed elseware.
+
+Usage:
 crypt -h [md5|sha1|sha256|sha512] -f <path to file>
 crypt -h [md5|sha1|sha256|sha512] -s "string literal"
 crypt -e [aes128|aes256] -f <path to file>
@@ -233,7 +240,7 @@ crypt -d [aes128|aes256] -s "string literal"
 -e: encrypt
 -d: decrypt
 
-encryption/decryption commands will prompt for key.
+Encryption/decryption commands will prompt for key.
 
 `
 	fmt.Println(msg)
