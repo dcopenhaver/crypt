@@ -320,20 +320,52 @@ func main() {
 		} else if *filepathParam != "" {
 
 			// encrypt supplied file - create new file named the same as the source file with .crypt appended - leave source file in tact
-			plaintext_bytes, err := ioutil.ReadFile(*filepathParam)
-			if err != nil {
-				log.Fatalf("Error reading file: %s\n%s", *filepathParam, err)
-			}
+			encrypted_filepath := *filepathParam + ".crypt"
+			if fileExists(encrypted_filepath) {
 
-			encrypted_bytes, err := encrypt(plaintext_bytes, passphrase, strings.ToLower(*encryptParam))
-			if err != nil {
-				log.Fatalf("Error encrypting file: %s\n%s", *filepathParam, err)
-			}
+				fmt.Printf("%s: already exists and will be overwritten!", encrypted_filepath)
+				fmt.Print("\nOverwrite existing file? [y/n]: ")
+				overwrite := "n"
+				fmt.Scan(&overwrite)
 
-			if ioutil.WriteFile(*filepathParam+".crypt", encrypted_bytes, 0664) != nil {
-				log.Fatalf("Error writting encrypted file: %s%s\n%s", *filepathParam, ".crypt", err)
+				if strings.ToLower(strings.TrimSpace(overwrite)) == "y" {
+
+					plaintext_bytes, err := ioutil.ReadFile(*filepathParam)
+					if err != nil {
+						log.Fatalf("Error reading file: %s\n%s", *filepathParam, err)
+					}
+
+					encrypted_bytes, err := encrypt(plaintext_bytes, passphrase, strings.ToLower(*encryptParam))
+					if err != nil {
+						log.Fatalf("Error encrypting file: %s\n%s", *filepathParam, err)
+					}
+
+					if ioutil.WriteFile(*filepathParam+".crypt", encrypted_bytes, 0664) != nil {
+						log.Fatalf("Error writting encrypted file: %s\n%s", encrypted_filepath, err)
+					} else {
+						fmt.Printf("Encrypted file created: %s\n", encrypted_filepath)
+					}
+				} else {
+					fmt.Println("Encryption aborted. No files modified.")
+				}
+
 			} else {
-				fmt.Printf("Encrypted file created: %s%s\n", *filepathParam, ".crypt")
+
+				plaintext_bytes, err := ioutil.ReadFile(*filepathParam)
+				if err != nil {
+					log.Fatalf("Error reading file: %s\n%s", *filepathParam, err)
+				}
+
+				encrypted_bytes, err := encrypt(plaintext_bytes, passphrase, strings.ToLower(*encryptParam))
+				if err != nil {
+					log.Fatalf("Error encrypting file: %s\n%s", *filepathParam, err)
+				}
+
+				if ioutil.WriteFile(*filepathParam+".crypt", encrypted_bytes, 0664) != nil {
+					log.Fatalf("Error writting encrypted file: %s\n%s", encrypted_filepath, err)
+				} else {
+					fmt.Printf("Encrypted file created: %s\n", encrypted_filepath)
+				}
 			}
 		}
 
@@ -393,9 +425,18 @@ func main() {
 					} else {
 						fmt.Printf("File decryption completed. Decrypted file:\n%s\n", decrypted_filepath)
 					}
+				} else {
+					fmt.Println("File decryption aborted, no files modified.")
+				}
+
+			} else {
+
+				if ioutil.WriteFile(decrypted_filepath, decrypted_bytes, 0664) != nil {
+					log.Fatalf("Error writting decrypted file: %s\n%s", decrypted_filepath, err)
+				} else {
+					fmt.Printf("File decryption completed. Decrypted file:\n%s\n", decrypted_filepath)
 				}
 			}
-
 		}
 	}
 }
