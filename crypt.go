@@ -18,6 +18,8 @@ import (
 	"log"
 	"os"
 	"strings"
+    "syscall"
+    "golang.org/x/crypto/ssh/terminal"
 )
 
 // Notes/intentions --------------------------
@@ -73,7 +75,7 @@ func createHash(value string, algo string) string {
 		sum_bytes = hasher.Sum(nil)
 
 	default:
-		log.Fatalln("Valid algo was not passed in to function: createHash.")
+		log.Fatalf("\n\nValid algo was not passed in to function: createHash.\n\n")
 	}
 
 	return hex.EncodeToString(sum_bytes)
@@ -83,7 +85,7 @@ func createFileHash(algo string, pathToFile string) string {
 
 	f, err := os.Open(pathToFile)
 	if err != nil {
-		log.Fatalf("Error opening file %s\n%s", pathToFile, err)
+		log.Fatalf("\n\nError opening file %s\n%s\n\n", pathToFile, err)
 	}
 
 	defer f.Close()
@@ -96,7 +98,7 @@ func createFileHash(algo string, pathToFile string) string {
 		hasher := sha1.New()
 
 		if _, err := io.Copy(hasher, f); err != nil {
-			log.Fatalf("Error during io.Copy.\n%s", err)
+			log.Fatalf("\n\nError during io.Copy.\n%s\n\n", err)
 		}
 
 		sum_bytes = hasher.Sum(nil)
@@ -105,7 +107,7 @@ func createFileHash(algo string, pathToFile string) string {
 		hasher := sha256.New()
 
 		if _, err := io.Copy(hasher, f); err != nil {
-			log.Fatalf("Error during io.Copy.\n%s", err)
+			log.Fatalf("\n\nError during io.Copy.\n%s\n\n", err)
 		}
 
 		sum_bytes = hasher.Sum(nil)
@@ -114,7 +116,7 @@ func createFileHash(algo string, pathToFile string) string {
 		hasher := sha512.New()
 
 		if _, err := io.Copy(hasher, f); err != nil {
-			log.Fatalf("Error during io.Copy.\n%s", err)
+			log.Fatalf("\n\nError during io.Copy.\n%s\n\n", err)
 		}
 
 		sum_bytes = hasher.Sum(nil)
@@ -123,13 +125,13 @@ func createFileHash(algo string, pathToFile string) string {
 		hasher := md5.New()
 
 		if _, err := io.Copy(hasher, f); err != nil {
-			log.Fatalf("Error during io.Copy.\n%s", err)
+			log.Fatalf("\n\nError during io.Copy.\n%s\n\n", err)
 		}
 
 		sum_bytes = hasher.Sum(nil)
 
 	default:
-		log.Fatalln("Valid algo was not passed in to function: createFileHash.")
+		log.Fatalf("\n\nValid algo was not passed in to function: createFileHash.\n\n")
 	}
 
 	return hex.EncodeToString(sum_bytes)
@@ -223,7 +225,6 @@ func fileExists(path string) bool {
 
 func showUsage() {
 	msg := `
-
 crypt:   A very basic tool for creating hashes and encrypting/decrypting files.
 Author:  David J. Copenhaver
 Version: v0.1
@@ -241,10 +242,22 @@ crypt -d [aes128|aes256] -s "string literal"
 -d: decrypt
 
 Encryption/decryption commands will prompt for key.
-
 `
 	fmt.Println(msg)
 	os.Exit(1)
+}
+
+func getSecret() string {
+
+    // syscall package is deprecated, will need to change below, keeping multi platform support
+    fmt.Printf("\nPassphrase/key: ")
+
+    passwordBytes, err := terminal.ReadPassword(int(syscall.Stdin))
+	if err != nil {
+		log.Fatalf("\n\nError reading from stdin.\n\n%v\n\n", err)
+	}
+
+	return strings.TrimSpace(string(passwordBytes))
 }
 
 // BEGIN MAIN ---------------------------------
@@ -310,19 +323,17 @@ func main() {
 	case "encrypt":
 
 		// get passphrase (used to create key)
-		passphrase := ""
-		fmt.Print("Enter passphrase: ")
-		fmt.Scan(&passphrase)
+		passphrase := getSecret()
 
 		if *stringParam != "" {
 
 			// encrypt and base64 encode the supplied string - send to stdout
 			encrypted_bytes, err := encrypt([]byte(*stringParam), passphrase, strings.ToLower(*encryptParam))
 			if err != nil {
-				log.Fatalln("Error occurred during encryption.", err)
+				log.Fatalf("\n\nError occurred during encryption.\n\n%v\n\n", err)
 			}
 
-			fmt.Println(base64.StdEncoding.EncodeToString(encrypted_bytes))
+			fmt.Printf("\n\n%v\n\n", base64.StdEncoding.EncodeToString(encrypted_bytes))
 
 		} else if *filepathParam != "" {
 
@@ -330,8 +341,8 @@ func main() {
 			encrypted_filepath := *filepathParam + ".crypt"
 			if fileExists(encrypted_filepath) {
 
-				fmt.Printf("%s: already exists and will be overwritten!", encrypted_filepath)
-				fmt.Print("\nOverwrite existing file? [y/n]: ")
+				fmt.Printf("\n\n%s: already exists and will be overwritten!\n", encrypted_filepath)
+				fmt.Printf("\nOverwrite existing file? [y/n]: ")
 				overwrite := "n"
 				fmt.Scan(&overwrite)
 
@@ -339,39 +350,39 @@ func main() {
 
 					plaintext_bytes, err := ioutil.ReadFile(*filepathParam)
 					if err != nil {
-						log.Fatalf("Error reading file: %s\n%s", *filepathParam, err)
+						log.Fatalf("\nError reading file: %s\n%s\n\n", *filepathParam, err)
 					}
 
 					encrypted_bytes, err := encrypt(plaintext_bytes, passphrase, strings.ToLower(*encryptParam))
 					if err != nil {
-						log.Fatalf("Error encrypting file: %s\n%s", *filepathParam, err)
+						log.Fatalf("\nError encrypting file: %s\n%s\n\n", *filepathParam, err)
 					}
 
 					if ioutil.WriteFile(*filepathParam+".crypt", encrypted_bytes, 0664) != nil {
-						log.Fatalf("Error writting encrypted file: %s\n%s", encrypted_filepath, err)
+						log.Fatalf("\nError writting encrypted file: %s\n%s\n\n", encrypted_filepath, err)
 					} else {
-						fmt.Printf("Encrypted file created: %s\n", encrypted_filepath)
+						fmt.Printf("\nEncrypted file created: %s\n\n", encrypted_filepath)
 					}
 				} else {
-					fmt.Println("Encryption aborted. No files modified.")
+					fmt.Printf("\nEncryption aborted. No files modified.\n\n")
 				}
 
 			} else {
 
 				plaintext_bytes, err := ioutil.ReadFile(*filepathParam)
 				if err != nil {
-					log.Fatalf("Error reading file: %s\n%s", *filepathParam, err)
+					log.Fatalf("\n\nError reading file: %s\n%s\n\n", *filepathParam, err)
 				}
 
 				encrypted_bytes, err := encrypt(plaintext_bytes, passphrase, strings.ToLower(*encryptParam))
 				if err != nil {
-					log.Fatalf("Error encrypting file: %s\n%s", *filepathParam, err)
+					log.Fatalf("\n\nError encrypting file: %s\n%s\n\n", *filepathParam, err)
 				}
 
 				if ioutil.WriteFile(*filepathParam+".crypt", encrypted_bytes, 0664) != nil {
-					log.Fatalf("Error writting encrypted file: %s\n%s", encrypted_filepath, err)
+					log.Fatalf("\n\nError writting encrypted file: %s\n%s\n\n", encrypted_filepath, err)
 				} else {
-					fmt.Printf("Encrypted file created: %s\n", encrypted_filepath)
+					fmt.Printf("\n\nEncrypted file created: %s\n\n", encrypted_filepath)
 				}
 			}
 		}
@@ -379,69 +390,67 @@ func main() {
 	case "decrypt":
 
 		// get passphrase (used to create key)
-		passphrase := ""
-		fmt.Print("Enter passphrase: ")
-		fmt.Scan(&passphrase)
+		passphrase := getSecret()
 
 		if *stringParam != "" {
 
 			// base64 decode and decrypt the supplied string - send to stdout
 			encrypted_bytes, err := base64.StdEncoding.DecodeString(*stringParam)
 			if err != nil {
-				log.Fatalln("Error base64 decoding encrypted string.", err)
+				log.Fatalf("\n\nError base64 decoding encrypted string.\n\n%v\n\n", err)
 			}
 
 			decrypted_bytes, err := decrypt(encrypted_bytes, passphrase, strings.ToLower(*decryptParam))
 			if err != nil {
-				log.Fatalln("Error occurred during decryption.", err)
+				log.Fatalf("\n\nError occurred during decryption.\n\n%v\n\n", err)
 			}
 
-			fmt.Println(string(decrypted_bytes))
+			fmt.Printf("\n\n%v\n\n", string(decrypted_bytes))
 
 		} else if *filepathParam != "" {
 
 			// decrypt supplied file, remove .crypt extension, if file with same name already exists (likely), prompt user for overwrite
 
 			if !strings.HasSuffix(*filepathParam, ".crypt") {
-				log.Fatalf("%s: does not have a '.crypt' suffix - will not attempt decryption.", *filepathParam)
+				log.Fatalf("\n\n%s: does not have a '.crypt' suffix - will not attempt decryption.\n\n", *filepathParam)
 			}
 
 			decrypted_filepath := strings.TrimSuffix(*filepathParam, ".crypt")
 
 			encrypted_bytes, err := ioutil.ReadFile(*filepathParam)
 			if err != nil {
-				log.Fatalf("Error reading file %s\n%s", *filepathParam, err)
+				log.Fatalf("\n\nError reading file %s\n%s\n\n", *filepathParam, err)
 			}
 
 			decrypted_bytes, err := decrypt(encrypted_bytes, passphrase, strings.ToLower(*decryptParam))
 			if err != nil {
-				log.Fatalf("Error decrypting file %s\n%s", *filepathParam, err)
+				log.Fatalf("\n\nError decrypting file %s\n%s\n\n", *filepathParam, err)
 			}
 
 			// check if file already exists, prompt for overwrite answer
 			if fileExists(decrypted_filepath) {
 
-				fmt.Printf("%s: already exists and will be overwritten!", decrypted_filepath)
+				fmt.Printf("\n\n%s: already exists and will be overwritten!\n", decrypted_filepath)
 				fmt.Print("\nOverwrite existing file? [y/n]: ")
 				overwrite := "n"
 				fmt.Scan(&overwrite)
 
 				if strings.ToLower(strings.TrimSpace(overwrite)) == "y" {
 					if ioutil.WriteFile(decrypted_filepath, decrypted_bytes, 0664) != nil {
-						log.Fatalf("Error writting decrypted file: %s\n%s", decrypted_filepath, err)
+						log.Fatalf("\nError writting decrypted file: %s\n%s\n\n", decrypted_filepath, err)
 					} else {
-						fmt.Printf("File decryption completed. Decrypted file:\n%s\n", decrypted_filepath)
+						fmt.Printf("\nFile decryption completed. Decrypted file:\n%s\n\n", decrypted_filepath)
 					}
 				} else {
-					fmt.Println("File decryption aborted, no files modified.")
+					fmt.Printf("\nFile decryption aborted, no files modified.\n\n")
 				}
 
 			} else {
 
 				if ioutil.WriteFile(decrypted_filepath, decrypted_bytes, 0664) != nil {
-					log.Fatalf("Error writting decrypted file: %s\n%s", decrypted_filepath, err)
+					log.Fatalf("\n\nError writting decrypted file: %s\n%s\n\n", decrypted_filepath, err)
 				} else {
-					fmt.Printf("File decryption completed. Decrypted file:\n%s\n", decrypted_filepath)
+					fmt.Printf("\n\nFile decryption completed. Decrypted file:\n%s\n\n", decrypted_filepath)
 				}
 			}
 		}
